@@ -14,6 +14,7 @@ struct FixedEffectModel <: RegressionModel
     esample::BitVector      # Is the row of the original dataframe part of the estimation sample?
     residuals::Union{AbstractVector, Nothing}
     fe::DataFrame
+    postest::NamedTuple     # Postestimation results
     fekeys::Vector{Symbol}
 
 
@@ -85,7 +86,7 @@ function StatsAPI.predict(m::FixedEffectModel, data)
         out = Xnew * m.coef
     else
         out = Vector{Union{Float64, Missing}}(missing, length(Tables.rows(cdata)))
-        out[nonmissings] = Xnew * m.coef 
+        out[nonmissings] = Xnew * m.coef
     end
 
     # Join FE estimates onto data and sum row-wise
@@ -186,14 +187,14 @@ function top(m::FixedEffectModel)
             "P-value" @sprintf("%.3f",m.p);
             ]
     if has_iv(m)
-        out = vcat(out, 
+        out = vcat(out,
             [
                 "F-statistic (first stage)" sprint(show, m.F_kp, context = :compact => true);
                 "P-value (first stage)" @sprintf("%.3f",m.p_kp);
             ])
     end
     if has_fe(m)
-        out = vcat(out, 
+        out = vcat(out,
             [
                 "R² within" @sprintf("%.3f",m.r2_within);
                 "Iterations" sprint(show, m.iterations, context = :compact => true);
@@ -249,7 +250,7 @@ function Base.show(io::IO, m::FixedEffectModel)
         end
         println(io)
     end
-   
+
     # rest of coeftable code
     println(io, repeat('=', totwidth))
     print(io, repeat(' ', sum(A[1])))
@@ -264,7 +265,7 @@ function Base.show(io::IO, m::FixedEffectModel)
     println(io, '\n', repeat('=', totwidth))
     nothing
 end
- 
+
 
 ##############################################################################
 ##

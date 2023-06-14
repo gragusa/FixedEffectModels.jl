@@ -18,8 +18,8 @@ Estimate a linear model with high dimensional categorical variables / instrument
 * `drop_singletons::Bool = true`: Should singletons be dropped?
 * `progress_bar::Bool = true`: Should the regression show a progressbar?
 * `first_stage::Bool = true`: Should the first-stage F-stat and p-value be computed?
-* `dof_add::Integer = 0`: 
-* `subset::Union{Nothing, AbstractVector} = nothing`: select specific rows. 
+* `dof_add::Integer = 0`:
+* `subset::Union{Nothing, AbstractVector} = nothing`: select specific rows.
 
 
 ### Details
@@ -47,7 +47,7 @@ df = dataset("plm", "Cigar")
 fit(FixedEffectModel, @formula(Sales ~ NDI + fe(State) + fe(State)&Year), df)
 ```
 """
-function reg(df,     
+function reg(df,
     formula::FormulaTerm,
     vcov::CovarianceEstimator = Vcov.simple();
     contrasts::Dict = Dict{Symbol, Any}(),
@@ -61,12 +61,12 @@ function reg(df,
     drop_singletons::Bool = true,
     progress_bar::Bool = true,
     dof_add::Integer = 0,
-    subset::Union{Nothing, AbstractVector} = nothing, 
+    subset::Union{Nothing, AbstractVector} = nothing,
     first_stage::Bool = true)
     StatsAPI.fit(FixedEffectModel, formula, df, vcov; contrasts = contrasts, weights = weights, save = save, method = method, nthreads = nthreads, double_precision = double_precision, tol = tol, maxiter = maxiter, drop_singletons = drop_singletons, progress_bar = progress_bar, dof_add = dof_add, subset = subset, first_stage = first_stage)
 end
-    
-function StatsAPI.fit(::Type{FixedEffectModel},     
+
+function StatsAPI.fit(::Type{FixedEffectModel},
     @nospecialize(formula::FormulaTerm),
     @nospecialize(df),
     @nospecialize(vcov::CovarianceEstimator = Vcov.simple());
@@ -81,7 +81,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
     @nospecialize(drop_singletons::Bool = true),
     @nospecialize(progress_bar::Bool = true),
     @nospecialize(dof_add::Integer = 0),
-    @nospecialize(subset::Union{Nothing, AbstractVector} = nothing), 
+    @nospecialize(subset::Union{Nothing, AbstractVector} = nothing),
     @nospecialize(first_stage::Bool = true))
 
     df = DataFrame(df; copycols = false)
@@ -226,7 +226,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
         formula_iv_schema = apply_schema(formula_iv, schema(formula_iv, subdf, contrasts), StatisticalModel)
         _, coefnames_iv = coefnames(formula_iv_schema)
         append!(var_names_all, coefnames_iv)
-    
+
         Z = convert(Matrix{Float64}, modelmatrix(formula_iv_schema, subdf))
         all(isfinite, Z) || throw("Some observations for the instrumental variables are infinite")
 
@@ -261,7 +261,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
             Xall = Combination(y, Xexo)
         end
 
-        # compute 2-norm (sum of squares) for each variable 
+        # compute 2-norm (sum of squares) for each variable
         # (to see if they are collinear with the fixed effects)
         sumsquares_pre = [sum(abs2, x) for x in eachcol(Xall)]
 
@@ -301,7 +301,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
             Z .= Z .* sqrtw
         end
     end
-    
+
 
 
 
@@ -311,7 +311,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
     ##
     ##############################################################################
     # Compute linearly independent columns + create the Xhat matrix
-    if has_iv    	
+    if has_iv
         n_exo = size(Xexo, 2)
         n_endo = size(Xendo, 2)
         n_z = size(Z, 2)
@@ -342,14 +342,14 @@ function StatsAPI.fit(::Type{FixedEffectModel},
             basis_endo2[basis_endo] = basis_endo_small
 
             # Change coef_names and oldX
-            # TODO: I should probably also change formula in this case so that predict still works 
+            # TODO: I should probably also change formula in this case so that predict still works
             ans = 1:length(basis_endo)
             ans = vcat(ans[.!basis_endo2], ans[basis_endo2])
             perm = vcat(1:length(basis_Xexo), length(basis_Xexo) .+ ans)
 
             out = join(coefendo_names[.!basis_endo2], " ")
             @info "Endogenous vars collinear with ivs. Recategorized as exogenous: $(out)"
-                                    
+
             # third pass
             basis_all = basis(eachcol(Xexo)..., eachcol(Z)..., eachcol(Xendo)...)
             basis_Xexo = basis_all[1:size(Xexo, 2)]
@@ -460,7 +460,7 @@ function StatsAPI.fit(::Type{FixedEffectModel},
     # Compute Fstat of First Stage
     if has_iv && first_stage
         Pip = Pi[(size(Pi, 1) - size(Z_res, 2) + 1):end, :]
-        try 
+        try
             r_kp = Vcov.ranktest!(Xendo_res, Z_res, Pip,
                               vcov_method, size(X, 2), dof_fes)
             p_kp = chisqccdf(size(Z_res, 2) - size(Xendo_res, 2) + 1, r_kp)
@@ -516,5 +516,19 @@ function StatsAPI.fit(::Type{FixedEffectModel},
         esample = trues(N)
     end
 
-    return FixedEffectModel(coef, matrix_vcov, vcov, nclusters, esample, residuals2, augmentdf, fekeys, coef_names, response_name, formula_origin, formula_schema, contrasts, nobs, dof_, dof_tstat_, rss, tss_total, r2, adjr2, F, p, iterations, converged, r2_within, F_kp, p_kp)
+    dp = double_precision ? Float64 : Float32
+    clusind = isa(vcov, Vcov.ClusterCovariance) ?
+    vcov_method.clusters[first(keys(vcov_method.clusters))] : []
+
+    postest = (
+        X=convert(Matrix{dp}, X),
+        Xhat=Xhat,
+        residuals=convert(Vector{dp}, residuals),
+        coef=convert(Vector{dp}, coef),
+        crossx = crossx,
+        f=clusind,
+        df=dof_residual
+      )
+
+    return FixedEffectModel(coef, matrix_vcov, vcov, nclusters, esample, residuals2, augmentdf, postest, fekeys, coef_names, response_name, formula_origin, formula_schema, contrasts, nobs, dof_, dof_tstat_, rss, tss_total, r2, adjr2, F, p, iterations, converged, r2_within, F_kp, p_kp)
 end
